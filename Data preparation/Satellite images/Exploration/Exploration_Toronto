@@ -1,0 +1,45 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var table = ee.FeatureCollection("users/Sander_Taragola/Toronto");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// In this script is used to explore the Sentinel-2 images during a certian period of 
+// interest of the city. 
+   
+// 1. Fill in the name of the city and the period of interest for the sentinel images.
+var city_name = 'Atlanta'
+var period = ['2020-05-28', '2020-08-29']
+
+// 2. Upload the city boundaries to the assets:
+//      - Go to the assets tab. Click new to upload the shapefile. Click select to choose 
+//        the file and upload to upload the file. 
+//      - Import the file into the script by double-clicking on the file and click import.
+
+// 3. Run the script.
+
+
+// -----------------------------------------------------------------------------
+// The script (No changes required.)
+// -----------------------------------------------------------------------------
+// The dates are converted
+var startDate = ee.Date(period[0]);
+var endDate = ee.Date(period[1]);
+// Load the Sentinel-2 collection
+var S2collection = ee.ImageCollection('COPERNICUS/S2_SR');
+// Convert the table to a geometry
+var City = ee.FeatureCollection(table).geometry();
+// Filter Collection using the city shapefile
+var S2City = S2collection.filterBounds(City);
+// Filter collection on cloud cover
+var S2Citylowclouds = S2City.filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10));
+// Filter collection on date
+var S2City = S2Citylowclouds.filterDate(startDate, endDate);
+// Vizualize all images
+var l = S2City.toList(100);
+for (var i = 0; i < l.length().getInfo(); i++) {
+  var im = ee.Image(l.get(i));
+  var d = ee.Date(im.get('system:time_start')).format('dd-MM').getInfo();
+  var tile = im.get('MGRS_TILE').getInfo();
+  Map.addLayer(im, {bands: ['B6', 'B4', 'B3'], min: 200, max: 2000}, d + ' ' + tile);
+}
+// vizualize city boundaries
+Map.centerObject(City);
+Map.addLayer(City, {color: '00DD00'}, city_name);

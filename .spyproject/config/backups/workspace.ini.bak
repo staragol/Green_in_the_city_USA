@@ -1,0 +1,12 @@
+[workspace]
+restore_data_on_startup = True
+save_data_on_exit = True
+save_history = True
+save_non_project_files = False
+project_type = 'empty-project-type'
+recent_files = ['censusclean\\data_cleaning_USA.py', 'censusclean\\censusclean.py', 'Data preparation\\Census data\\Canada\\census_preparation_CA.py', 'censusclean\\data_cleaning_CA.py']
+
+[main]
+version = 0.2.0
+recent_files = []
+

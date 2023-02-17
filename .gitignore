@@ -1,0 +1,4 @@
+.venv/
+*.CSV
+Data preparation/Raw data/
+Workshop/

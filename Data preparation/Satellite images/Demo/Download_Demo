@@ -1,0 +1,88 @@
+// In this script the desired Sentinel-2 images are exported to Google Drive, 
+// where they can be downloaded so they can be used in QGIS. It is important
+// to first explore the satellite images in the script: 'Exploration/Atlanta'.
+// NOTE: Only the Sentinel2-images of one day can be downloaded at a time. If 
+//       images of multiple dates are required, the script has to be ran for
+//       each date seperately.
+
+// 1. Fill in the name of the city and the period of interest for the sentinel images. 
+//    Please limit the time-window so only the images of one single day are left. 
+//    Preferentially choose the first date the day of the desired satellite image, 
+//    since this day will be used in the filename of the exported image. The second date 
+//    can be set to the following day, to ensure only the image of interest will be used.
+var city_name = 'Atlanta'
+var period = ['2021-07-28', '2021-07-29']
+
+// 2. Upload the city boundaries to the assets:
+//      - Go to the assets tab. Click new to upload the shapefile. Click select to choose 
+//        the file and upload to upload the file. 
+//      - Import the file into the script by double-clicking on the file and click import.
+//      - Run the script once to show the boundaries (green).
+
+// 3. Draw a rectangle widely around the city boundaries to delineate the area of interest.
+//    Rename the geometry to 'Frame'.
+
+// 4. Run the script.
+
+// 5. Go to the tasks tab (on the right), which lists the tasks for exporting. 
+//    Click run to export the file to Google Drive. A pop-up window allows you 
+//    to change the file location and name. Click run to start the export. This
+//    may take a few minutes. When the task is completed the file can be found
+//    in Google Drive on the chosen location.
+
+// -----------------------------------------------------------------------------
+// The script (No changes required.)
+// -----------------------------------------------------------------------------
+// The dates are converted
+var startDate = ee.Date(period[0]);
+var endDate = ee.Date(period[1]);
+// Load the Sentinel-2 collection
+var S2collection = ee.ImageCollection('COPERNICUS/S2_SR');
+// Convert the table to a geometry
+var City = ee.FeatureCollection(table).geometry();
+// Filter Collection using the city shapefile
+var S2City = S2collection.filterBounds(City);
+// Filter collection on cloud cover
+var S2Citylowclouds = S2City.filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10));
+// Filter collection on date
+var S2City = S2Citylowclouds.filterDate(startDate, endDate);
+// add NDVI band in order to maximize the quality of the image during mozaicking
+var addQualityBands = function(image) {
+  // Normalized difference vegetation index.
+  var ndvi = image.normalizedDifference(['B5', 'B4']);
+  // Image timestamp as milliseconds since Unix epoch.
+  var millis = ee.Image(image.getNumber('system:time_start'))
+                   .rename('millis').toFloat();
+  return image.addBands([ndvi, millis]);
+};
+
+// Mozaic overlapping images
+var im = S2City
+  .map(addQualityBands)
+  .qualityMosaic('nd')
+// Show image in the map
+var d = startDate.format('dd-MM-YYYY').getInfo();
+Map.centerObject(City);
+Map.addLayer(City, {color: '00DD00'}, city_name);
+
+// Export image to Google Drive
+var exportedImage = im
+  .select(['B2', 'B3', 'B4', 'B6'])
+  .rename(['B1_blue', 'B2_green', 'B3_red', 'B4_NIR'])
+  .unitScale(0, 4096).multiply(255)
+  .toUint8()
+  .toFloat()
+  .divide(255).multiply(254)
+  .toUint8()
+var projection = S2City.first().select('B2').projection().getInfo();
+print(projection)
+Export.image.toDrive({
+  image: exportedImage,
+  folder: 'green in the city',
+  description: city_name+'_sentinel_'+period[0],
+  crs: projection.crs,
+  crsTransform: projection.transform,
+  region: Frame
+});
+Map.addLayer(exportedImage, {bands: ['B1_blue', 'B2_green', 'B3_red'], min: 10, max: 240}, d);
+print(exportedImage)
